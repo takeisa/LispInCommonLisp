@@ -1,4 +1,7 @@
 # LispInCommonLisp
 An implementation of Lisp in Common Lisp
 
-This software is released under the MIT License, see LICENSE.
+This program has been created with reference to the SICP (Structure and Interpretation of Computer Programs by Harold Abelson and Gerald Jay Sussman with Julie Sussman).
+
+This software is released under a Creative Commons Attribution-ShareAlike 4.0 International License.
+
