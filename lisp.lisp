@@ -97,7 +97,6 @@
 (defun repl ()
   (let ((env (env-extend (make-env) nil nil)))
    (loop
-;;     (fresh-line)
      (format t "LISP> ")
      (t-print (t-eval (read) env))
      (fresh-line))))
