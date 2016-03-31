@@ -62,6 +62,7 @@
     ((self-evaluating-p exp) exp)
     ((variable-p exp) (env-get env exp))
     ((quoted-p exp) (object-of-quoted exp))
+    ((assignment-p exp) (eval-assignment exp env))
     ((definition-p exp) (eval-definition exp env))
     (t 'not-implemented)))
 
@@ -84,10 +85,18 @@
 (defun definition-p (exp)
   (tagged-list-p exp 'define))
 
+(defun assignment-p (exp)
+  (tagged-list-p exp 'set!))
+
 (defun eval-definition (exp env)
   (let ((var (cadr exp))
 	(val (eval (caddr exp))))
     (frame-define! (env-first-frame env) var val)))
+
+(defun eval-assignment (exp env)
+  (let ((var (cadr exp))
+	(val (eval (caddr exp))))
+    (frame-set! (env-first-frame env) var val)))
 
 (defun t-print (exp)
   (prin1 exp))
