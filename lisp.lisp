@@ -40,7 +40,7 @@
   (labels ((iter (vars vals)
 	     (if (null vars)
 		 (if define
-		     (frame-add-var-val! frame var val)
+		     (frame-append-var-val! frame var val)
 		     (error "undefined variable: ~a" var))
 		 (if (eq var (car vars))
 		     (rplaca vals val)
