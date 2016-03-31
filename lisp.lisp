@@ -90,14 +90,14 @@
     (frame-define! (env-first-frame env) var val)))
 
 (defun t-print (exp)
-  (print exp))
+  (prin1 exp))
 
 (defun t-apply ())
 
 (defun repl ()
   (let ((env (env-extend (make-env) nil nil)))
-   (loop
-     (format t "LISP> ")
-     (t-print (t-eval (read) env))
-     (fresh-line))))
+    (loop
+      (fresh-line)
+      (format t "LISP> ")
+      (t-print (t-eval (read) env)))))
 
