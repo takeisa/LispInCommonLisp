@@ -12,7 +12,7 @@
 
 (defun env-get (env var)
   (if (null env)
-      (error "undefined variable: ~a~%" var)
+      (error "undefined variable: ~a" var)
       (multiple-value-bind (val exist) (frame-get (env-first-frame env) var)
 	(if (null exist)
 	    (env-get (env-rest env) var)
@@ -28,15 +28,20 @@
 (defun frame-vals (frame)
   (cdr frame))
 
-(defun frame-define! (frame var val)
+(defun frame-append-var-val! (frame var val)
   (rplaca frame (cons var (frame-vars frame)))
   (rplacd frame (cons val (frame-vals frame)))
   'ok)
 
-(defun frame-set! (frame var val)
+(defun frame-define! (frame var val)
+  (frame-set! frame var val t))
+
+(defun frame-set! (frame var val &optional (define nil))
   (labels ((iter (vars vals)
 	     (if (null vars)
-		 (error "undefined variable: ~a~%" var)
+		 (if define
+		     (frame-add-var-val! frame var val)
+		     (error "undefined variable: ~a" var))
 		 (if (eq var (car vars))
 		     (rplaca vals val)
 		     (iter (cdr vars) (cdr vals))))))
@@ -57,6 +62,7 @@
     ((self-evaluating-p exp) exp)
     ((variable-p exp) (env-get env exp))
     ((quoted-p exp) (object-of-quoted exp))
+    ((definition-p exp) (eval-definition exp env))
     (t 'not-implemented)))
 
 (defun self-evaluating-p (exp)
@@ -75,15 +81,24 @@
 (defun object-of-quoted (exp)
   (cadr exp))
 
+(defun definition-p (exp)
+  (tagged-list-p exp 'define))
+
+(defun eval-definition (exp env)
+  (let ((var (cadr exp))
+	(val (eval (caddr exp))))
+    (frame-define! (env-first-frame env) var val)))
+
 (defun t-print (exp)
   (print exp))
 
 (defun t-apply ())
 
 (defun repl ()
-  (let ((env (make-env)))
+  (let ((env (env-extend (make-env) nil nil)))
    (loop
-     (fresh-line)
+;;     (fresh-line)
      (format t "LISP> ")
-     (t-print (t-eval (read) env)))))
+     (t-print (t-eval (read) env))
+     (fresh-line))))
 
