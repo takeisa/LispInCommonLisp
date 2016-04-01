@@ -85,17 +85,33 @@
 (defun definition-p (exp)
   (tagged-list-p exp 'define))
 
+(defun definition-var (exp)
+  (if (symbolp (cadr exp))
+      (cadr exp)
+      (caadr exp)))
+
+(defun definition-val (exp)
+  (if (symbolp (cadr exp))
+      (caddr exp)
+      (error "not implemented lambda")))
+
 (defun assignment-p (exp)
   (tagged-list-p exp 'set!))
 
+(defun assignment-var (exp)
+  (cadr exp))
+
+(defun assignment-val (exp)
+  (caddr exp))
+
 (defun eval-definition (exp env)
-  (let ((var (cadr exp))
-	(val (eval (caddr exp))))
+  (let ((var (definition-var exp))
+	(val (definition-val exp)))
     (frame-define! (env-first-frame env) var val)))
 
 (defun eval-assignment (exp env)
-  (let ((var (cadr exp))
-	(val (eval (caddr exp))))
+  (let ((var (assignment-var exp))
+	(val (eval (assignment-val exp))))
     (frame-set! (env-first-frame env) var val)))
 
 (defun t-print (exp)
