@@ -64,6 +64,7 @@
     ((quoted-p exp) (object-of-quoted exp))
     ((assignment-p exp) (eval-assignment exp env))
     ((definition-p exp) (eval-definition exp env))
+    ((application-p exp) (eval-application exp env))
     (t 'not-implemented)))
 
 (defun self-evaluating-p (exp)
@@ -114,15 +115,64 @@
 	(val (eval (assignment-val exp))))
     (frame-set! (env-first-frame env) var val)))
 
+(defun application-p (exp)
+  (consp exp))
+
+(defun application-operator (exp)
+  (car exp))
+
+(defun application-operand (exp)
+  (cdr exp))
+
+(defun eval-application (exp env)
+  (let ((procedure (t-eval (application-operator exp) env))
+	(args (list-of-values (application-operand exp) env)))
+    (t-apply procedure args)))
+
+(defun list-of-values (args env)
+  (mapcar #'(lambda (arg) (t-eval arg env)) args))
+
+(defun primitive-procedure-p (exp)
+  (tagged-list-p exp 'primitive))
+
+(defun primitive-implementation (procedure)
+  (cadr procedure))
+
 (defun t-print (exp)
   (prin1 exp))
 
-(defun t-apply ())
+(defun t-apply (procedure args)
+  (cond
+    ((primitive-procedure-p procedure)
+     (apply-primitive-procedure procedure args))
+    (t (format t "t-apply: ~a ~a~%" procedure args)
+       (error "not implemented"))))
+
+(defun apply-primitive-procedure (procedure args)
+  (apply (primitive-implementation procedure) args))
+
+(defparameter *primitive-procedures*
+	      `((+ ,#'+)
+		(- ,#'-)
+		(* ,#'*)
+		(/ ,#'/)))
+
+(defun procedure-name (procedure)
+  (car procedure))
+
+(defun procedure-object (procedure)
+  (cadr procedure))
+
+(defun make-global-env (primitive-procedures)
+  (env-extend (make-env)
+	      (mapcar #'procedure-name primitive-procedures)
+	      (mapcar #'(lambda (procedure)
+			  `(primitive ,(procedure-object procedure)))
+		      primitive-procedures)))
 
 (defun repl ()
-  (let ((env (env-extend (make-env) nil nil)))
+  (let ((env (make-global-env *primitive-procedures*)))
     (loop
       (fresh-line)
       (format t "LISP> ")
       (t-print (t-eval (read) env)))))
-
