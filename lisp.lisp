@@ -65,6 +65,7 @@
     ((assignment-p exp) (eval-assignment exp env))
     ((definition-p exp) (eval-definition exp env))
     ((lambda-p exp) (eval-lambda exp env))
+    ((begin-p exp) (eval-sequence (begin-actions exp) env))
     ((application-p exp) (eval-application exp env))
     (t 'not-implemented)))
 
@@ -141,6 +142,28 @@
     ;; (format t "lambda parameters: ~a~%" parameters)
     ;; (format t "lambda body: ~a~%" body)
    `(procedure ,parameters ,body ,env)))
+
+(defun begin-p (exp)
+  (tagged-list-p exp 'begin))
+
+(defun begin-actions (exp)
+  (cdr exp))
+
+(defun last-exp-p (exps)
+  (null (cdr exps)))
+
+(defun first-exp (exps)
+  (car exps))
+
+(defun rest-exps (exps)
+  (cdr exps))
+
+(defun eval-sequence (exps env)
+  (if (last-exp-p exps)
+     (t-eval (first-exp exps) env)
+     (progn
+       (t-eval (first-exp exps) env)
+       (eval-sequence (rest-exps exps) env))))
 
 (defun application-p (exp)
   (consp exp))
