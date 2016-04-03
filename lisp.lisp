@@ -58,7 +58,7 @@
     (iter (frame-vars frame) (frame-vals frame))))
 
 (defun t-eval (exp env)
-;;  (format t "t-eval: ~a~%" exp)
+  (format t "t-eval: ~a~%" exp)
   (cond
     ((self-evaluating-p exp) exp)
     ((variable-p exp) (env-get env exp))
@@ -99,16 +99,18 @@
   (if (symbolp (cadr exp))
       (caddr exp)
       (make-lambda (cdadr exp)
-		   (caddr exp))))
+		   (cddr exp))))
 
 (defun make-lambda (parameters body)
+  (format t "make-lamba parameters: ~a~%" parameters)
+  (format t "make-lamba body: ~a~%" body)
   `(lambda (,parameters . ,body)))
 
 (defun lambda-parameters (exp)
-  (cadr exp))
+  (caadr exp))
 
 (defun lambda-body (exp)
-  (cddr exp))
+  (cdadr exp))
 
 (defun assignment-p (exp)
   (tagged-list-p exp 'set!))
@@ -140,9 +142,9 @@
 (defun make-procedure (exp env)
   (let ((parameters (lambda-parameters exp))
 	(body (lambda-body exp)))
-    ;; (format t "lambda: ~a~%" exp)
-    ;; (format t "lambda parameters: ~a~%" parameters)
-    ;; (format t "lambda body: ~a~%" body)
+    (format t "lambda: ~a~%" exp)
+    (format t "lambda parameters: ~a~%" parameters)
+    (format t "lambda body: ~a~%" body)
    `(procedure ,parameters ,body ,env)))
 
 (defun procedure-parameters (procedure)
