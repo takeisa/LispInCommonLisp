@@ -58,6 +58,7 @@
     (iter (frame-vars frame) (frame-vals frame))))
 
 (defun t-eval (exp env)
+  ;; (format t "t-eval: ~a~%" exp)
   (cond
     ((self-evaluating-p exp) exp)
     ((variable-p exp) (env-get env exp))
@@ -103,10 +104,10 @@
   `(lambda (,parameters . ,body)))
 
 (defun lambda-parameters (exp)
-  (caadr exp))
+  (cadr exp))
 
 (defun lambda-body (exp)
-  (cdadr exp))
+  (cddr exp))
 
 (defun assignment-p (exp)
   (tagged-list-p exp 'set!))
