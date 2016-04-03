@@ -249,17 +249,31 @@
 	(body (procedure-body procedure))
 	(env (procedure-env procedure)))
     (let ((extended-env (env-extend env vars args)))
-      (format t "vars: ~a~%" vars)
-      (format t "args: ~a~%" args)
-      (format t "body: ~a~%" body)
-      (format t "env: ~a~%" extended-env)
+      ;; (format t "vars: ~a~%" vars)
+      ;; (format t "args: ~a~%" args)
+      ;; (format t "body: ~a~%" body)
+      ;; (format t "env: ~a~%" extended-env)
       (eval-sequence body extended-env))))
+
+(defun to-boolean (exp)
+  (if (null exp)
+      'false
+      'true))
+
+(defun boolean-operator (operator)
+  #'(lambda (&rest args)
+      (to-boolean (apply operator args))))
 
 (defparameter *primitive-procedures*
 	      `((+ ,#'+)
 		(- ,#'-)
 		(* ,#'*)
-		(/ ,#'/)))
+		(/ ,#'/)
+		(= ,#'=)
+		(< ,(boolean-operator #'<))
+		(> ,(boolean-operator #'>))
+		(<= ,(boolean-operator #'<=))
+		(>= ,(boolean-operator #'>=))))
 
 (defun procedure-name (procedure)
   (car procedure))
