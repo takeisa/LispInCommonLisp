@@ -140,8 +140,7 @@
     ;; (format t "lambda: ~a~%" exp)
     ;; (format t "lambda parameters: ~a~%" parameters)
     ;; (format t "lambda body: ~a~%" body)
-   `(procedure ,parameters ,body ,env)
-    ))
+   `(procedure ,parameters ,body ,env)))
 
 (defun application-p (exp)
   (consp exp))
