@@ -58,7 +58,7 @@
     (iter (frame-vars frame) (frame-vals frame))))
 
 (defun t-eval (exp env)
-  ;; (format t "t-eval: ~a~%" exp)
+;;  (format t "t-eval: ~a~%" exp)
   (cond
     ((self-evaluating-p exp) exp)
     ((variable-p exp) (env-get env exp))
@@ -66,6 +66,7 @@
     ((assignment-p exp) (eval-assignment exp env))
     ((definition-p exp) (eval-definition exp env))
     ((lambda-p exp) (eval-lambda exp env))
+    ((if-p exp) (eval-if exp env))
     ((begin-p exp) (eval-sequence (begin-actions exp) env))
     ((application-p exp) (eval-application exp env))
     (t 'not-implemented)))
@@ -152,6 +153,32 @@
 
 (defun procedure-env (procedure)
   (cadddr procedure))
+
+(defun if-p (exp)
+  (tagged-list-p exp 'if))
+
+(defun if-predicate (exp)
+  (cadr exp))
+
+(defun if-consequent (exp)
+  (caddr exp))
+
+(defun if-alternative (exp)
+  (let ((alternative (cadddr exp)))
+    (if alternative
+	alternative
+	'false)))
+
+(defun true-p (exp)
+  (not (false-p exp)))
+
+(defun false-p (exp)
+  (eq exp 'false))
+
+(defun eval-if (exp env)
+  (if (true-p (t-eval (if-predicate exp) env))
+      (t-eval (if-consequent exp) env)
+      (t-eval (if-alternative exp) env)))
 
 (defun begin-p (exp)
   (tagged-list-p exp 'begin))
