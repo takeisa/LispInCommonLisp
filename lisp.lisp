@@ -143,6 +143,15 @@
     ;; (format t "lambda body: ~a~%" body)
    `(procedure ,parameters ,body ,env)))
 
+(defun procedure-parameters (procedure)
+  (cadr procedure))
+
+(defun procedure-body (procedure)
+  (caddr procedure))
+
+(defun procedure-env (procedure)
+  (cadddr procedure))
+
 (defun begin-p (exp)
   (tagged-list-p exp 'begin))
 
@@ -188,6 +197,9 @@
 (defun primitive-implementation (procedure)
   (cadr procedure))
 
+(defun compound-procedure-p (exp)
+  (tagged-list-p exp 'procedure))
+
 (defun t-print (exp)
   (prin1 exp))
 
@@ -195,11 +207,23 @@
   (cond
     ((primitive-procedure-p procedure)
      (apply-primitive-procedure procedure args))
-    (t (format t "t-apply: ~a ~a~%" procedure args)
-       (error "not implemented"))))
+    ((compound-procedure-p procedure)
+     (apply-compound-procedure procedure args))
+    (t (error "unknown procedure type: ~a" procedure))))
 
 (defun apply-primitive-procedure (procedure args)
   (apply (primitive-implementation procedure) args))
+
+(defun apply-compound-procedure (procedure args)
+  (let ((vars (procedure-parameters procedure))
+	(body (procedure-body procedure))
+	(env (procedure-env procedure)))
+    (let ((extended-env (env-extend env vars args)))
+      (format t "vars: ~a~%" vars)
+      (format t "args: ~a~%" args)
+      (format t "body: ~a~%" body)
+      (format t "env: ~a~%" extended-env)
+      (eval-sequence body extended-env))))
 
 (defparameter *primitive-procedures*
 	      `((+ ,#'+)
