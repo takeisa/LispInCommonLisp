@@ -64,6 +64,7 @@
     ((quoted-p exp) (object-of-quoted exp))
     ((assignment-p exp) (eval-assignment exp env))
     ((definition-p exp) (eval-definition exp env))
+    ((lambda-p exp) (eval-lambda exp env))
     ((application-p exp) (eval-application exp env))
     (t 'not-implemented)))
 
@@ -94,7 +95,17 @@
 (defun definition-val (exp)
   (if (symbolp (cadr exp))
       (caddr exp)
-      (error "not implemented lambda")))
+      (make-lambda (cdadr exp)
+		   (caddr exp))))
+
+(defun make-lambda (parameters body)
+  `(lambda (,parameters . ,body)))
+
+(defun lambda-parameters (exp)
+  (caadr exp))
+
+(defun lambda-body (exp)
+  (cdadr exp))
 
 (defun assignment-p (exp)
   (tagged-list-p exp 'set!))
@@ -108,12 +119,29 @@
 (defun eval-definition (exp env)
   (let ((var (definition-var exp))
 	(val (definition-val exp)))
-    (frame-define! (env-first-frame env) var val)))
+    (frame-define! (env-first-frame env)
+		   var
+		   (t-eval val env))))
 
 (defun eval-assignment (exp env)
   (let ((var (assignment-var exp))
 	(val (eval (assignment-val exp))))
     (frame-set! (env-first-frame env) var val)))
+
+(defun lambda-p (exp)
+  (tagged-list-p exp 'lambda))
+
+(defun eval-lambda (exp env)
+  (make-procedure exp env))
+
+(defun make-procedure (exp env)
+  (let ((parameters (lambda-parameters exp))
+	(body (lambda-body exp)))
+    ;; (format t "lambda: ~a~%" exp)
+    ;; (format t "lambda parameters: ~a~%" parameters)
+    ;; (format t "lambda body: ~a~%" body)
+   `(procedure ,parameters ,body ,env)
+    ))
 
 (defun application-p (exp)
   (consp exp))
@@ -171,7 +199,8 @@
 		      primitive-procedures)))
 
 (defun repl ()
-  (let ((env (make-global-env *primitive-procedures*)))
+  (let ((*print-circle* t)
+	(env (make-global-env *primitive-procedures*)))
     (loop
       (fresh-line)
       (format t "LISP> ")
