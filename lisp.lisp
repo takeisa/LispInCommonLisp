@@ -67,6 +67,7 @@
     ((definition-p exp) (eval-definition exp env))
     ((lambda-p exp) (eval-lambda exp env))
     ((if-p exp) (eval-if exp env))
+    ((cond-p exp) (t-eval (cond->if exp) env))
     ((begin-p exp) (eval-sequence (begin-actions exp) env))
     ((application-p exp) (eval-application exp env))
     (t 'not-implemented)))
