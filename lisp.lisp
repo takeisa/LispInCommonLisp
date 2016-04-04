@@ -270,7 +270,7 @@
 		(- ,#'-)
 		(* ,#'*)
 		(/ ,#'/)
-		(= ,#'=)
+		(= ,(boolean-operator #'=))
 		(< ,(boolean-operator #'<))
 		(> ,(boolean-operator #'>))
 		(<= ,(boolean-operator #'<=))
