@@ -157,6 +157,9 @@
 (defun procedure-env (procedure)
   (cadddr procedure))
 
+(defun make-if (pred consequent alternative)
+  `(if ,pred ,consequent ,alternative))
+
 (defun if-p (exp)
   (tagged-list-p exp 'if))
 
@@ -182,6 +185,47 @@
   (if (true-p (t-eval (if-predicate exp) env))
       (t-eval (if-consequent exp) env)
       (t-eval (if-alternative exp) env)))
+
+(defun cond-p (exp)
+  (tagged-list-p exp 'cond))
+
+(defun first-cond-clause (exp)
+  (car exp))
+
+(defun rest-cond-clauses (exp)
+  (cdr exp))
+
+(defun cond-clause-pred (clause)
+  (car clause))
+
+(defun cond-clause-exps (clause)
+  (cdr clause))
+
+(defun else-clause-p (clause)
+  (tagged-list-p clause 'else))
+
+(defun cond->if (exp)
+  (labels ((iter (clauses)
+	     (if (null clauses)
+		 'false
+		 (let* ((clause (first-cond-clause clauses))
+			(pred (cond-clause-pred clause))
+			(exps (cond-clause-exps clause)))
+		   (if (eq pred 'else)
+		       `(begin ,@exps)
+		       `(if ,pred
+			    (begin ,@exps)
+			    ,(iter (rest-cond-clauses clauses))))))))
+    (iter (cdr exp))))
+
+;; (cond (pred1 exp1 ...)
+;;       (pred2 exp2 ...)
+;;       (else exp3...))
+;;
+;; (if pred1 (begin exp1 ...)
+;;     (if pred2 (begin exp2 ...)
+;;         (begin exp3 ...)))
+
 
 (defun begin-p (exp)
   (tagged-list-p exp 'begin))
