@@ -343,4 +343,6 @@
     (loop
       (fresh-line)
       (format t "LISP> ")
-      (t-print (t-eval (read) env)))))
+      (handler-case
+	  (t-print (t-eval (read) env))
+	(error (e) (princ e))))))
