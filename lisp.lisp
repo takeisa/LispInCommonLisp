@@ -68,6 +68,8 @@
     ((lambda-p exp) (eval-lambda exp env))
     ((if-p exp) (eval-if exp env))
     ((cond-p exp) (t-eval (cond->if exp) env))
+    ((and-p exp) (eval-and exp env))
+    ((or-p exp) (eval-or exp env))
     ((begin-p exp) (eval-sequence (begin-actions exp) env))
     ((application-p exp) (eval-application exp env))
     (t 'not-implemented)))
@@ -226,12 +228,51 @@
 ;;     (if pred2 (begin exp2 ...)
 ;;         (begin exp3 ...)))
 
+;; and
+
+(defun and-p (exp)
+  (tagged-list-p exp 'and))
+
+(defun and-exps (exp)
+  (cdr exp))
+
+(defun eval-and (exp env)
+  (when (null (and-exps exp))
+    (error "no expressions"))
+  (labels ((iter (exps)
+	     (if (last-exp-p exps)
+		 (t-eval (first-exp exps) env)
+		 (let ((result (t-eval (first-exp exps) env)))
+		   (if (true-p result)
+		       (iter (rest-exps exps))
+		       result)))))
+      (iter (and-exps exp))))
+
+;; or
+(defun or-p (exp)
+  (tagged-list-p exp 'or))
+
+(defun eval-or (exp env)
+  (when (null (and-exps exp))
+    (error "no expressions"))
+  (labels ((iter (exps)
+	     (if (last-exp-p exps)
+		 (t-eval (first-exp exps) env)
+		 (let ((result (t-eval (first-exp exps) env)))
+		   (if (true-p result)
+		       result
+		       (iter (rest-exps exps)))))))
+    (iter (and-exps exp))))
+
+;; begin
 
 (defun begin-p (exp)
   (tagged-list-p exp 'begin))
 
 (defun begin-actions (exp)
   (cdr exp))
+
+;; expressions
 
 (defun last-exp-p (exps)
   (null (cdr exps)))
@@ -343,6 +384,8 @@
     (loop
       (fresh-line)
       (format t "LISP> ")
+;;      (t-print (t-eval (read) env))
       (handler-case
-	  (t-print (t-eval (read) env))
-	(error (e) (princ e))))))
+      	  (t-print (t-eval (read) env))
+      	(error (e) (princ e))))))
+      )))
