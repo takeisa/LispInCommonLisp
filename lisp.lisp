@@ -70,6 +70,7 @@
     ((cond-p exp) (t-eval (cond->if exp) env))
     ((and-p exp) (eval-and exp env))
     ((or-p exp) (eval-or exp env))
+    ((let-p exp) (t-eval (let->combination exp) env))
     ((begin-p exp) (eval-sequence (begin-actions exp) env))
     ((application-p exp) (eval-application exp env))
     (t 'not-implemented)))
@@ -263,6 +264,7 @@
       (iter (and-exps exp))))
 
 ;; or
+
 (defun or-p (exp)
   (tagged-list-p exp 'or))
 
@@ -277,6 +279,25 @@
 		       result
 		       (iter (rest-exps exps)))))))
     (iter (and-exps exp))))
+
+;; let
+
+(defun let-p (exp)
+  (tagged-list-p exp 'let))
+
+(defun let-vars (exp)
+  (cadr exp))
+
+(defun let-body (exp)
+  (cddr exp))
+
+(defun let->combination (exp)
+  (let ((vars (mapcar #'(lambda (var) (car var))
+		      (let-vars exp)))
+	(vals (mapcar #'(lambda (var) (cadr var))
+		      (let-vars exp)))
+	(body (let-body exp)))
+    `(,(make-lambda vars body) ,@vals)))
 
 ;; begin
 
@@ -405,3 +426,8 @@
       ;; 	  (t-print (t-eval (read) env))
       ;; 	(error (e) (princ e))))))
       )))
+
+;; for debug
+(defun p (value)
+  (format t "debug: ~a~%" value)
+  value)
