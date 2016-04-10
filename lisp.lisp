@@ -110,10 +110,10 @@
   `(lambda (,parameters . ,body)))
 
 (defun lambda-parameters (exp)
-  (caadr exp))
+  (cadr exp))
 
 (defun lambda-body (exp)
-  (cdadr exp))
+  (caddr exp))
 
 (defun assignment-p (exp)
   (tagged-list-p exp 'set!))
