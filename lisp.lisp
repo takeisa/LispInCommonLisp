@@ -107,7 +107,7 @@
 (defun make-lambda (parameters body)
   (format t "make-lamba parameters: ~a~%" parameters)
   (format t "make-lamba body: ~a~%" body)
-  `(lambda ,parameters ,body))
+  `(lambda ,parameters ,@body))
 
 (defun lambda-parameters (exp)
   (cadr exp))
