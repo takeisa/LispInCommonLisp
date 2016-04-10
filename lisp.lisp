@@ -102,18 +102,18 @@
   (if (symbolp (cadr exp))
       (caddr exp)
       (make-lambda (cdadr exp)
-		   (cddr exp))))
+		   (caddr exp))))
 
 (defun make-lambda (parameters body)
   (format t "make-lamba parameters: ~a~%" parameters)
   (format t "make-lamba body: ~a~%" body)
-  `(lambda (,parameters . ,body)))
+  `(lambda ,parameters ,body))
 
 (defun lambda-parameters (exp)
   (cadr exp))
 
 (defun lambda-body (exp)
-  (caddr exp))
+  (cddr exp))
 
 (defun assignment-p (exp)
   (tagged-list-p exp 'set!))
@@ -328,6 +328,8 @@
     (t (error "unknown procedure type: ~a" procedure))))
 
 (defun apply-primitive-procedure (procedure args)
+  (format t "apply-pp procedure: ~a~%" procedure)
+  (format t "apply-pp args: ~a~%" args)
   (apply (primitive-implementation procedure) args))
 
 (defun apply-compound-procedure (procedure args)
@@ -335,10 +337,10 @@
 	(body (procedure-body procedure))
 	(env (procedure-env procedure)))
     (let ((extended-env (env-extend env vars args)))
-      ;; (format t "vars: ~a~%" vars)
-      ;; (format t "args: ~a~%" args)
-      ;; (format t "body: ~a~%" body)
-      ;; (format t "env: ~a~%" extended-env)
+      (format t "apply-cp vars: ~a~%" vars)
+      (format t "apply-cp args: ~a~%" args)
+      (format t "apply-cp body: ~a~%" body)
+      (format t "apply-cp env: ~a~%" extended-env)
       (eval-sequence body extended-env))))
 
 (defun to-boolean (exp)
