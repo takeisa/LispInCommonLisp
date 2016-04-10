@@ -197,11 +197,17 @@
 (defun rest-cond-clauses (exp)
   (cdr exp))
 
+(defun cond-clause-recipient-p (exp)
+  (eq (cadr exp) '=>))
+
 (defun cond-clause-pred (clause)
   (car clause))
 
 (defun cond-clause-exps (clause)
   (cdr clause))
+
+(defun cond-clause-recipient (clause)
+  (caddr clause))
 
 (defun else-clause-p (clause)
   (tagged-list-p clause 'else))
@@ -211,13 +217,21 @@
 	     (if (null clauses)
 		 'false
 		 (let* ((clause (first-cond-clause clauses))
-			(pred (cond-clause-pred clause))
-			(exps (cond-clause-exps clause)))
-		   (if (eq pred 'else)
-		       `(begin ,@exps)
-		       `(if ,pred
-			    (begin ,@exps)
-			    ,(iter (rest-cond-clauses clauses))))))))
+			(pred (cond-clause-pred clause)))
+		   (if (cond-clause-recipient-p clause)
+		       (let ((recipient (cond-clause-recipient clause)))
+			 ;; TODO remove the site effect
+			 (if (eq pred 'else)
+			     `(,recipient ,pred)
+			     `(if ,pred
+				  (,recipient ,pred)
+				  ,(iter (rest-cond-clauses clauses)))))
+		       (let ((exps (cond-clause-exps clause)))
+			 (if (eq pred 'else)
+			     `(begin ,@exps)
+			     `(if ,pred
+				  (begin ,@exps)
+				  ,(iter (rest-cond-clauses clauses))))))))))
     (iter (cdr exp))))
 
 ;; (cond (pred1 exp1 ...)
@@ -386,8 +400,8 @@
     (loop
       (fresh-line)
       (format t "LISP> ")
-;;      (t-print (t-eval (read) env))
-      (handler-case
-      	  (t-print (t-eval (read) env))
-      	(error (e) (princ e))))))
+      (t-print (t-eval (read) env))
+      ;; (handler-case
+      ;; 	  (t-print (t-eval (read) env))
+      ;; 	(error (e) (princ e))))))
       )))
