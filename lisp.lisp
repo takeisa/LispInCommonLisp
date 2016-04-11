@@ -71,6 +71,7 @@
     ((and-p exp) (eval-and exp env))
     ((or-p exp) (eval-or exp env))
     ((let-p exp) (t-eval (let->combination exp) env))
+    ((let*-p exp) (t-eval (let*->nested-let exp) env))
     ((begin-p exp) (eval-sequence (begin-actions exp) env))
     ((application-p exp) (eval-application exp env))
     (t 'not-implemented)))
@@ -298,6 +299,36 @@
 		      (let-vars exp)))
 	(body (let-body exp)))
     `(,(make-lambda vars body) ,@vals)))
+
+;; let*
+
+(defun let*-p (exp)
+  (tagged-list-p exp 'let*))
+
+(defun let*-vars (exp)
+  (cadr exp))
+
+(defun let*-body (exp)
+  (cddr exp))
+
+(defun let*-last-var-p (vars)
+  (null (cdr vars)))
+
+(defun let*-first-var (vars)
+  (car vars))
+
+(defun let*-rest-vars (vars)
+  (cdr vars))
+
+(defun let*->nested-let (exp)
+  (labels ((iter (vars)
+	     (let ((var (let*-first-var vars)))
+	      (if (let*-last-var-p vars)
+		  `(let (,var)
+		     ,@(let*-body exp))
+		  `(let (,var)
+		     ,(iter (let*-rest-vars vars)))))))
+    (iter (let*-vars exp))))
 
 ;; begin
 
