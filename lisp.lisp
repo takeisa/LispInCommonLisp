@@ -1,6 +1,9 @@
 (defun make-env ()
   '())
 
+(defun env-frame-empty-p (env)
+  (null env))
+
 (defun env-first-frame (env)
   (car env))
 
@@ -32,21 +35,6 @@
   (rplaca frame (cons var (frame-vars frame)))
   (rplacd frame (cons val (frame-vals frame)))
   'ok)
-
-(defun frame-define! (frame var val)
-  (frame-set! frame var val t))
-
-(defun frame-set! (frame var val &optional (define nil))
-  (labels ((iter (vars vals)
-	     (if (null vars)
-		 (if define
-		     (frame-append-var-val! frame var val)
-		     (error "undefined variable: ~a" var))
-		 (if (eq var (car vars))
-		     (rplaca vals val)
-		     (iter (cdr vars) (cdr vals))))))
-    (iter (frame-vars frame) (frame-vals frame))
-    'ok))
 
 (defun frame-get (frame var)
   (labels ((iter (vars vals)
@@ -84,7 +72,7 @@
   (symbolp exp))
 
 (defun tagged-list-p (exp tag)
-  (eq (car exp) tag))
+  (and (consp exp) (eq (car exp) tag)))
 
 (defun quoted-p (exp)
   (tagged-list-p exp 'quote))
@@ -104,7 +92,7 @@
   (if (symbolp (cadr exp))
       (caddr exp)
       (make-lambda (cdadr exp)
-		   (caddr exp))))
+		   (cddr exp))))
 
 (defun make-lambda (parameters body)
   (format t "make-lamba parameters: ~a~%" parameters)
@@ -129,14 +117,41 @@
 (defun eval-definition (exp env)
   (let ((var (definition-var exp))
 	(val (definition-val exp)))
-    (frame-define! (env-first-frame env)
-		   var
-		   (t-eval val env))))
+    (define-variable! (env-first-frame env)
+	var
+      (t-eval val env))
+    'ok))
 
 (defun eval-assignment (exp env)
+  (format t "eval-assignment: exp=~a~%" exp)
+  (format t "eval-assignment: env=~a~%" env)
   (let ((var (assignment-var exp))
 	(val (eval (assignment-val exp))))
-    (frame-set! (env-first-frame env) var val)))
+    (set-variable-value! env var val)
+    'ok))
+
+(defun define-variable! (frame var val)
+  (labels ((iter (vars vals)
+	     (if (null vars)
+		 (frame-append-var-val! frame var val)
+		 (if (eq var (car vars))
+		     (rplaca vals val)
+		     (iter (cdr vars) (cdr vals))))))
+    (iter (frame-vars frame) (frame-vals frame))))
+
+(defun set-variable-value! (env var val)
+  (labels ((iter-frame (env)
+	     (labels ((iter (vars vals)
+			(if (null vars)
+			    (iter-frame (env-rest env))
+			    (if (eq var (car vars))
+				(rplaca vals val)
+				(iter (cdr vars) (cdr vals))))))
+	       (if (env-frame-empty-p env)
+		 (error "undefined variable: ~a" var)
+		 (let ((frame (env-first-frame env)))
+		   (iter (frame-vars frame) (frame-vals frame)))))))
+    (iter-frame env)))
 
 (defun lambda-p (exp)
   (tagged-list-p exp 'lambda))
@@ -186,7 +201,7 @@
   (eq exp 'false))
 
 (defun eval-if (exp env)
-  (if (true-p (t-eval (if-predicate exp) env))
+  (if (true-p (force-it (t-eval (if-predicate exp) env)))
       (t-eval (if-consequent exp) env)
       (t-eval (if-alternative exp) env)))
 
@@ -349,7 +364,7 @@
 (defun rest-exps (exps)
   (cdr exps))
 
-(defun eval-sequence (exps env)
+ (defun eval-sequence (exps env)
   (if (last-exp-p exps)
      (t-eval (first-exp exps) env)
      (progn
@@ -362,13 +377,18 @@
 (defun application-operator (exp)
   (car exp))
 
-(defun application-operand (exp)
+(defun application-operand (exp)`<
   (cdr exp))
 
+;; (defun eval-application (exp env)
+;;   (let ((procedure (t-eval (application-operator exp) env))
+;; 	(args (list-of-values (application-operand exp) env)))
+;;     (t-apply procedure args)))
+
 (defun eval-application (exp env)
-  (let ((procedure (t-eval (application-operator exp) env))
-	(args (list-of-values (application-operand exp) env)))
-    (t-apply procedure args)))
+  (let ((procedure (actual-value (application-operator exp) env))
+	(args (application-operand exp)))
+    (t-apply procedure args env)))
 
 (defun list-of-values (args env)
   (mapcar #'(lambda (arg) (t-eval arg env)) args))
@@ -385,29 +405,65 @@
 (defun t-print (exp)
   (prin1 exp))
 
-(defun t-apply (procedure args)
+;; (defun t-apply (procedure args)
+;;   (cond
+;;     ((primitive-procedure-p procedure)
+;;      (apply-primitive-procedure procedure args))
+;;     ((compound-procedure-p procedure)
+;;      (apply-compound-procedure procedure args))
+;;     (t (error "unknown procedure type: ~a" procedure))))
+
+(defun t-apply (procedure args env)
   (cond
     ((primitive-procedure-p procedure)
-     (apply-primitive-procedure procedure args))
+     (apply-primitive-procedure procedure args env))
     ((compound-procedure-p procedure)
-     (apply-compound-procedure procedure args))
+     (apply-compound-procedure procedure args env))
     (t (error "unknown procedure type: ~a" procedure))))
 
-(defun apply-primitive-procedure (procedure args)
+;; (defun apply-primitive-procedure (procedure args)
+;;   (format t "apply-pp procedure: ~a~%" procedure)
+;;   (format t "apply-pp args: ~a~%" args)
+;;   (apply (primitive-implementation procedure) args))
+
+(defun apply-primitive-procedure (procedure args env)
   (format t "apply-pp procedure: ~a~%" procedure)
   (format t "apply-pp args: ~a~%" args)
-  (apply (primitive-implementation procedure) args))
+  (let ((actual-args (list-of-actual-args args env)))
+    (format t "apply-pp actual-args: ~a~%" actual-args)
+    (apply (primitive-implementation procedure) actual-args)))
 
-(defun apply-compound-procedure (procedure args)
+(defun list-of-actual-args (args env)
+  (mapcar #'(lambda (arg)
+	      (actual-value arg env))
+	  args))
+
+;; (defun apply-compound-procedure (procedure args)
+;;   (let ((vars (procedure-parameters procedure))
+;; 	(body (procedure-body procedure))
+;; 	(env (procedure-env procedure)))
+;;     (let ((extended-env (env-extend env vars args)))
+;;       (format t "apply-cp vars: ~a~%" vars)
+;;       (format t "apply-cp args: ~a~%" args)
+;;       (format t "apply-cp body: ~a~%" body)
+;;       (format t "apply-cp env: ~a~%" extended-env)
+;;       (eval-sequence body extended-env))))
+
+(defun apply-compound-procedure (procedure args env)
   (let ((vars (procedure-parameters procedure))
 	(body (procedure-body procedure))
 	(env (procedure-env procedure)))
-    (let ((extended-env (env-extend env vars args)))
+    (let ((extended-env (env-extend env vars (list-of-delayed-args args env))))
       (format t "apply-cp vars: ~a~%" vars)
       (format t "apply-cp args: ~a~%" args)
       (format t "apply-cp body: ~a~%" body)
       (format t "apply-cp env: ~a~%" extended-env)
       (eval-sequence body extended-env))))
+
+(defun list-of-delayed-args (args env)
+  (mapcar #'(lambda (arg)
+	      (delay-it arg env))
+	  args))
 
 (defun to-boolean (exp)
   (if (null exp)
@@ -435,6 +491,48 @@
 (defun procedure-object (procedure)
   (cadr procedure))
 
+;; lazy evaluation
+
+(defun actual-value (exp env)
+;;  (format t "actual-value: env=~a~%" env)
+;;  (format t "actual-value: exp=~a~%" exp)
+  (let ((evaluated-value (t-eval exp env)))
+;;    (format t "actual-value: evaluated-value=~a~%" evaluated-value)
+    (force-it evaluated-value)))
+
+(defun delay-it (exp env)
+  (list 'thunk exp env))
+
+(defun thunk-p (obj)
+  (tagged-list-p obj 'thunk))
+
+(defun thunk-exp (thunk)
+  (cadr thunk))
+
+(defun thunk-env (thunk)
+  (caddr thunk))
+
+(defun evaluated-thunk-p (thunk)
+  (tagged-list-p thunk 'evaluated-thunk))
+
+(defun thunk-value (evaluated-thunk)
+  (cadr evaluated-thunk))
+
+(defun force-it (obj)
+  (cond ((thunk-p obj)
+	 (let ((result (actual-value
+			(thunk-exp obj)
+			(thunk-env obj))))
+	   (setf (car obj) 'evaluated-thunk)
+	   (setf (cadr obj) result)
+	   (setf (caddr obj) nil)
+	   result))
+	((evaluated-thunk-p obj)
+	 (thunk-value obj))
+	(t obj)))
+
+;; repl
+
 (defun make-global-env (primitive-procedures)
   (let ((env (env-extend (make-env)
 			 (mapcar #'procedure-name primitive-procedures)
@@ -452,7 +550,7 @@
     (loop
       (fresh-line)
       (format t "LISP> ")
-      (t-print (t-eval (read) env))
+      (t-print (force-it (t-eval (read) env)))
       ;; (handler-case
       ;; 	  (t-print (t-eval (read) env))
       ;; 	(error (e) (princ e))))))
@@ -462,3 +560,14 @@
 (defun p (value)
   (format t "debug: ~a~%" value)
   value)
+
+;; (define (unless condition usual exceptional)
+;;     (if condition exceptional usual))
+
+;; (unless (= 1 0) 'hoge (/ 1 0))
+
+;; (define (integer n)
+;;     (cons n (integer (+ n 1))))
+
+
+;; (define count 0) (define (test1) (set! count 1) count) (test1)
