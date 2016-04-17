@@ -1,6 +1,9 @@
 (defun make-env ()
   '())
 
+(defun env-frame-empty-p (env)
+  (null env))
+
 (defun env-first-frame (env)
   (car env))
 
@@ -32,21 +35,6 @@
   (rplaca frame (cons var (frame-vars frame)))
   (rplacd frame (cons val (frame-vals frame)))
   'ok)
-
-(defun frame-define! (frame var val)
-  (frame-set! frame var val t))
-
-(defun frame-set! (frame var val &optional (define nil))
-  (labels ((iter (vars vals)
-	     (if (null vars)
-		 (if define
-		     (frame-append-var-val! frame var val)
-		     (error "undefined variable: ~a" var))
-		 (if (eq var (car vars))
-		     (rplaca vals val)
-		     (iter (cdr vars) (cdr vals))))))
-    (iter (frame-vars frame) (frame-vals frame))
-    'ok))
 
 (defun frame-get (frame var)
   (labels ((iter (vars vals)
@@ -84,7 +72,7 @@
   (symbolp exp))
 
 (defun tagged-list-p (exp tag)
-  (eq (car exp) tag))
+  (and (consp exp) (eq (car exp) tag)))
 
 (defun quoted-p (exp)
   (tagged-list-p exp 'quote))
@@ -104,7 +92,7 @@
   (if (symbolp (cadr exp))
       (caddr exp)
       (make-lambda (cdadr exp)
-		   (caddr exp))))
+		   (cddr exp))))
 
 (defun make-lambda (parameters body)
   (format t "make-lamba parameters: ~a~%" parameters)
@@ -129,14 +117,41 @@
 (defun eval-definition (exp env)
   (let ((var (definition-var exp))
 	(val (definition-val exp)))
-    (frame-define! (env-first-frame env)
-		   var
-		   (t-eval val env))))
+    (define-variable! (env-first-frame env)
+	var
+      (t-eval val env))
+    'ok))
 
 (defun eval-assignment (exp env)
+  (format t "eval-assignment: exp=~a~%" exp)
+  (format t "eval-assignment: env=~a~%" env)
   (let ((var (assignment-var exp))
 	(val (eval (assignment-val exp))))
-    (frame-set! (env-first-frame env) var val)))
+    (set-variable-value! env var val)
+    'ok))
+
+(defun define-variable! (frame var val)
+  (labels ((iter (vars vals)
+	     (if (null vars)
+		 (frame-append-var-val! frame var val)
+		 (if (eq var (car vars))
+		     (rplaca vals val)
+		     (iter (cdr vars) (cdr vals))))))
+    (iter (frame-vars frame) (frame-vals frame))))
+
+(defun set-variable-value! (env var val)
+  (labels ((iter-frame (env)
+	     (labels ((iter (vars vals)
+			(if (null vars)
+			    (iter-frame (env-rest env))
+			    (if (eq var (car vars))
+				(rplaca vals val)
+				(iter (cdr vars) (cdr vals))))))
+	       (if (env-frame-empty-p env)
+		 (error "undefined variable: ~a" var)
+		 (let ((frame (env-first-frame env)))
+		   (iter (frame-vars frame) (frame-vals frame)))))))
+    (iter-frame env)))
 
 (defun lambda-p (exp)
   (tagged-list-p exp 'lambda))
