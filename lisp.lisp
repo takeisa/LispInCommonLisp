@@ -126,7 +126,7 @@
   (format t "eval-assignment: exp=~a~%" exp)
   (format t "eval-assignment: env=~a~%" env)
   (let ((var (assignment-var exp))
-	(val (eval (assignment-val exp))))
+	(val (t-eval (assignment-val exp)) env))
     (set-variable-value! env var val)
     'ok))
 
@@ -457,8 +457,8 @@
 				     `(primitive ,(procedure-object procedure)))
 				 primitive-procedures))))
     (let ((frame (env-first-frame env)))
-      (frame-define! frame 'true 'true)
-      (frame-define! frame 'false 'false))
+      (define-variable! frame 'true 'true)
+      (define-variable! frame 'false 'false))
     env))
 
 (defun repl ()
