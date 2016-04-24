@@ -46,23 +46,61 @@
     (iter (frame-vars frame) (frame-vals frame))))
 
 (defun t-eval (exp env)
-  (format t "t-eval: ~a~%" exp)
+  (funcall (analyze exp) env))
+
+(defun analyze (exp)
+  (format t "analyze: ~a~%" exp)
   (cond
-    ((self-evaluating-p exp) exp)
-    ((variable-p exp) (env-get env exp))
-    ((quoted-p exp) (object-of-quoted exp))
-    ((assignment-p exp) (eval-assignment exp env))
-    ((definition-p exp) (eval-definition exp env))
-    ((lambda-p exp) (eval-lambda exp env))
-    ((if-p exp) (eval-if exp env))
-    ((cond-p exp) (t-eval (cond->if exp) env))
-    ((and-p exp) (eval-and exp env))
-    ((or-p exp) (eval-or exp env))
-    ((let-p exp) (t-eval (let->combination exp) env))
-    ((let*-p exp) (t-eval (let*->nested-let exp) env))
-    ((begin-p exp) (eval-sequence (begin-actions exp) env))
-    ((application-p exp) (eval-application exp env))
+    ((self-evaluating-p exp) (analyze-self-evaluating exp))
+    ((variable-p exp) (analyze-variable exp))
+    ((quoted-p exp) (analyze-quoted exp))
+    ((assignment-p exp) (analyze-assignment exp))
+    ((definition-p exp) (analyze-definiton exp))
+    ((lambda-p exp) (analyze-lambda exp))
+    ((if-p exp) (analyze-if exp))
+    ((cond-p exp) (analyze (cond->if exp)))
+    ((and-p exp) (analyze-and exp))
+    ((or-p exp) (analyze-or exp))
+    ((let-p exp) (analyze (let->combination exp)))
+    ((let*-p exp) (analyze (let*->nested-let exp)))
+    ((begin-p exp) (analyze-sequence (begin-actions exp)))
+    ((application-p exp) (analyze-application exp))
     (t 'not-implemented)))
+
+(defun analyze-self-evaluating (exp)
+  (lambda (env) exp))
+
+(defun analyze-variable (exp)
+  (lambda (env) (env-get env exp)))
+
+(defun analyze-quoted (exp)
+  (let ((qval (object-of-quoted exp)))
+    (lambda (env) qval)))
+
+(defun analyze-assignment (exp)
+  (let ((var (assignment-var exp))
+	(val-proc (analyze (assignment-val exp))))
+    (lambda (env)
+     (set-variable-value! env var (funcall val-proc env))
+     'ok)))
+
+(defun analyze-definiton (exp)
+  (let ((var (definition-var exp))
+	(val-proc (analyze (definition-val exp))))
+    (lambda (env)
+      (define-variable!
+	  (env-first-frame env)
+	  var (funcall val-proc env))
+      'ok)))
+
+(defun analyze-if (exp)
+  (let ((pred-proc (analyze (if-predicate exp)))
+	(consequent-proc (analyze (if-consequent exp)))
+	(alternative-proc (analyze (if-alternative exp))))
+    (lambda (env)
+      (if (true-p (funcall pred-proc env))
+	  (funcall consequent-proc env)
+	  (funcall alternative-proc env)))))
 
 (defun self-evaluating-p (exp)
   (or (numberp exp)
@@ -114,22 +152,6 @@
 (defun assignment-val (exp)
   (caddr exp))
 
-(defun eval-definition (exp env)
-  (let ((var (definition-var exp))
-	(val (definition-val exp)))
-    (define-variable! (env-first-frame env)
-	var
-      (t-eval val env))
-    'ok))
-
-(defun eval-assignment (exp env)
-  (format t "eval-assignment: exp=~a~%" exp)
-  (format t "eval-assignment: env=~a~%" env)
-  (let ((var (assignment-var exp))
-	(val (t-eval (assignment-val exp)) env))
-    (set-variable-value! env var val)
-    'ok))
-
 (defun define-variable! (frame var val)
   (labels ((iter (vars vals)
 	     (if (null vars)
@@ -156,21 +178,23 @@
 (defun lambda-p (exp)
   (tagged-list-p exp 'lambda))
 
-(defun eval-lambda (exp env)
-  (make-procedure exp env))
+(defun analyze-lambda (exp)
+  (lambda (env)
+    (make-procedure exp env)))
 
 (defun make-procedure (exp env)
   (let ((parameters (lambda-parameters exp))
-	(body (lambda-body exp)))
+	(body (lambda-body exp)) ;; for debug
+	(body-proc (analyze-sequence (lambda-body exp))))
     (format t "lambda: ~a~%" exp)
     (format t "lambda parameters: ~a~%" parameters)
     (format t "lambda body: ~a~%" body)
-   `(procedure ,parameters ,body ,env)))
+   `(procedure ,parameters ,body-proc ,env)))
 
 (defun procedure-parameters (procedure)
   (cadr procedure))
 
-(defun procedure-body (procedure)
+(defun procedure-body-proc (procedure)
   (caddr procedure))
 
 (defun procedure-env (procedure)
@@ -199,11 +223,6 @@
 
 (defun false-p (exp)
   (eq exp 'false))
-
-(defun eval-if (exp env)
-  (if (true-p (t-eval (if-predicate exp) env))
-      (t-eval (if-consequent exp) env)
-      (t-eval (if-alternative exp) env)))
 
 (defun cond-p (exp)
   (tagged-list-p exp 'cond))
@@ -267,34 +286,36 @@
 (defun and-exps (exp)
   (cdr exp))
 
-(defun eval-and (exp env)
+(defun analyze-and (exp)
   (when (null (and-exps exp))
     (error "no expressions"))
-  (labels ((iter (exps)
-	     (if (last-exp-p exps)
-		 (t-eval (first-exp exps) env)
-		 (let ((result (t-eval (first-exp exps) env)))
-		   (if (true-p result)
-		       (iter (rest-exps exps))
-		       result)))))
-      (iter (and-exps exp))))
+  (labels ((iter (procs env)
+	      (if (null (cdr procs))
+		  (funcall (car procs) env)
+		  (let ((result (funcall (car procs) env)))
+		    (if (true-p result)
+			(iter (cdr procs) env)
+			result)))))
+    (let ((exp-procs (mapcar #'analyze (and-exps exp))))
+      (lambda (env) (iter exp-procs env)))))
 
 ;; or
 
 (defun or-p (exp)
   (tagged-list-p exp 'or))
 
-(defun eval-or (exp env)
+(defun analyze-or (exp)
   (when (null (and-exps exp))
     (error "no expressions"))
-  (labels ((iter (exps)
-	     (if (last-exp-p exps)
-		 (t-eval (first-exp exps) env)
-		 (let ((result (t-eval (first-exp exps) env)))
+  (labels ((iter (procs env)
+	     (if (null (cdr procs))
+		 (funcall (car procs) env)
+		 (let ((result (funcall (car procs) env)))
 		   (if (true-p result)
 		       result
-		       (iter (rest-exps exps)))))))
-    (iter (and-exps exp))))
+		       (iter (cdr procs) env))))))
+    (let ((exp-procs (mapcar #'analyze (and-exps exp))))
+      (lambda (env) (iter exp-procs env)))))
 
 ;; let
 
@@ -364,12 +385,19 @@
 (defun rest-exps (exps)
   (cdr exps))
 
-(defun eval-sequence (exps env)
-  (if (last-exp-p exps)
-     (t-eval (first-exp exps) env)
-     (progn
-       (t-eval (first-exp exps) env)
-       (eval-sequence (rest-exps exps) env))))
+(defun analyze-sequence (exps)
+  (labels
+      ((sequentially (proc1 proc2)
+	 (lambda (env) (funcall proc1 env) (funcall proc2 env)))
+       (iter (first-proc rest-procs)
+	 (if (last-exp-p rest-procs)
+	     first-proc
+	     (iter (sequentially first-proc (car rest-procs))
+		   (cdr rest-procs)))))
+    (let ((procs (mapcar #'analyze exps)))
+      (if (null procs)
+	  (error "empty sequence")
+	  (iter (car procs) (cdr procs))))))
 
 (defun application-p (exp)
   (consp exp))
@@ -380,13 +408,16 @@
 (defun application-operand (exp)
   (cdr exp))
 
-(defun eval-application (exp env)
-  (let ((procedure (t-eval (application-operator exp) env))
-	(args (list-of-values (application-operand exp) env)))
-    (t-apply procedure args)))
+(defun analyze-application (exp)
+  (let ((procedure-proc (analyze (application-operator exp)))
+	(arg-procs (list-of-value-procs (application-operand exp))))
+    (lambda (env)
+      (t-apply
+       (funcall procedure-proc env)
+       (mapcar #'(lambda (proc) (funcall proc env)) arg-procs)))))
 
-(defun list-of-values (args env)
-  (mapcar #'(lambda (arg) (t-eval arg env)) args))
+(defun list-of-value-procs (args)
+  (mapcar #'analyze args))
 
 (defun primitive-procedure-p (exp)
   (tagged-list-p exp 'primitive))
@@ -415,14 +446,14 @@
 
 (defun apply-compound-procedure (procedure args)
   (let ((vars (procedure-parameters procedure))
-	(body (procedure-body procedure))
+	(body-proc (procedure-body-proc procedure))
 	(env (procedure-env procedure)))
     (let ((extended-env (env-extend env vars args)))
       (format t "apply-cp vars: ~a~%" vars)
       (format t "apply-cp args: ~a~%" args)
-      (format t "apply-cp body: ~a~%" body)
+      (format t "apply-cp body: ~a~%" body-proc)
       (format t "apply-cp env: ~a~%" extended-env)
-      (eval-sequence body extended-env))))
+      (funcall body-proc extended-env))))
 
 (defun to-boolean (exp)
   (if (null exp)
